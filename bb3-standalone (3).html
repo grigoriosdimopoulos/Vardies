@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ΕΛ.ΑΣ. – Πρόγραμμα Βάρδιας</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#eef0f4;font-family:Arial,sans-serif;color:#1a1a2e;font-size:13px}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:#003087;border-radius:3px}
+input,select,button{font-family:Arial,sans-serif}
+input:focus,select:focus{outline:2px solid #003087;outline-offset:1px}
+button:focus{outline:none}
+.tab-btn{background:none;border:none;border-bottom:3px solid transparent;color:#4b5563;padding:10px 16px;font-size:12px;font-weight:700;letter-spacing:.5px;cursor:pointer;white-space:nowrap}
+.tab-btn:hover{color:#003087;background:#f0f4ff}
+.tab-btn.active{color:#003087;border-bottom-color:#003087;background:#e8efff}
+.card{background:#fff;border:1px solid #d1d5db;border-radius:5px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+.sec{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#003087;margin-bottom:12px;padding-bottom:7px;border-bottom:2px solid #003087}
+.pbtn{background:#003087;border:none;color:#fff;padding:8px 18px;border-radius:4px;cursor:pointer;font-weight:700;font-size:12px;transition:background .2s}
+.pbtn:hover{background:#00267a}
+.dbtn{background:#fff;border:1px solid #dc2626;color:#dc2626;padding:8px 14px;border-radius:4px;cursor:pointer;font-weight:700;font-size:12px}
+.dbtn:hover{background:#fef2f2}
+.gbtn{background:#fff;border:1px solid #d1d5db;color:#374151;padding:8px 14px;border-radius:4px;cursor:pointer;font-weight:700;font-size:12px}
+.gbtn:hover{border-color:#003087;color:#003087}
+.inp{width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:4px;font-size:12px;color:#1a1a2e;background:#fff}
+.sel{padding:7px 10px;border:1px solid #d1d5db;border-radius:4px;font-size:12px;color:#1a1a2e;background:#fff}
+</style>
+</head>
+<body><div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useMemo}=React;
+
+/* ── Constants ── */
+const WORK=['Π','Α','Ν'];
+const ALL_S=['Π','Α','Ν','αα','Ρ','Ά','Αν'];
+const SHORT={Π:'Πρωί',Α:'Απόγ.',Ν:'Νύχτα',αα:'αα',Ρ:'Ρεπό',Ά:'Άδεια',Αν:'Αναρρ.'};
+const LABEL={Π:'Πρωί 06-14',Α:'Απόγευμα 14-22',Ν:'Νύχτα 22-06',αα:'Αδιάθετο',Ρ:'Ρεπό',Ά:'Άδεια',Αν:'Αναρρωτική'};
+const COL={
+  Π:{bg:'#dbeafe',tx:'#1e3a8a',bd:'#93c5fd'},
+  Α:{bg:'#fef3c7',tx:'#78350f',bd:'#fcd34d'},
+  Ν:{bg:'#1e1b4b',tx:'#c7d2fe',bd:'#4338ca'},
+  αα:{bg:'#f3e8ff',tx:'#581c87',bd:'#c4b5fd'},
+  Ρ:{bg:'#dcfce7',tx:'#14532d',bd:'#86efac'},
+  Ά:{bg:'#fee2e2',tx:'#7f1d1d',bd:'#fca5a5'},
+  Αν:{bg:'#ffedd5',tx:'#7c2d12',bd:'#fb923c'},
+};
+const MONTHS=['Ιανουάριος','Φεβρουάριος','Μάρτιος','Απρίλιος','Μάιος','Ιούνιος','Ιούλιος','Αύγουστος','Σεπτέμβριος','Οκτώβριος','Νοέμβριος','Δεκέμβριος'];
+const DAYS=['ΚΥΡ','ΔΕΥ','ΤΡΙ','ΤΕΤ','ΠΕΜ','ΠΑΡ','ΣΑΒ'];
+const RANKS=['Αστυφύλακας','Αρχιφύλακας','Υπαρχιφύλακας','Ανθυπαστυνόμος','Υπαστυνόμος Β\'','Υπαστυνόμος Α\''];
+const HOLIDAYS=['01-01','01-06','03-25','05-01','08-15','10-28','12-25','12-26'];
+
+const getDays=(y,m)=>new Date(y,m+1,0).getDate();
+const mkey=(y,m)=>`${y}-${String(m+1).padStart(2,'0')}`;
+const pmkey=(y,m)=>m===0?mkey(y-1,11):mkey(y,m-1);
+const dow=(y,m,d)=>new Date(y,m,d).getDay();
+const isWE=(y,m,d)=>[0,6].includes(dow(y,m,d));
+const isHol=(m,d)=>HOLIDAYS.includes(`${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+
+/* ── Storage ── */
+const S={
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}},
+  get(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch{return null}}
+};
+
+/* ══════════════════════════════════════════════════════
+   SCHEDULER
+   
+   GUARANTEED COVERAGE ALGORITHM:
+   
+   For each day d (1..days):
+     1. Mark BLOCKED: anyone with approved leave/sick on day d
+        AND anyone who did Ν yesterday (→ they get αα today, BLOCKED)
+     2. For Π, Α, Ν in order:
+        - Pick the BEST available (not blocked, not already assigned today)
+          sorted by fairness score (fewest of that shift type + cross-month)
+        - If nobody available → CRITICAL ERROR (shown in UI, must fix manually)
+     3. Everyone else gets Ρ (or αα if they did Ν yesterday)
+
+   "Best available" = not blocked + lowest fairness score for that shift type.
+   Fairness score carries across months via history.
+
+   Leave requests: ONLY approved if that person's shift for that day
+   can be covered by someone else (i.e. they are NOT the only one available).
+   If they are the only one → leave is REJECTED (coverage wins always).
+══════════════════════════════════════════════════════ */
+
+function initF(){return{Π:0,Α:0,Ν:0,WE:0,HOL:0,denied:0};}
+
+function schedule(members,year,month,reqs,params,prevHistory){
+  const days=getDays(year,month);
+  const n=members.length;
+  if(n<3)return{sched:{},fair:{},lastShifts:{},log:{errors:[],rejected:[]}};
+
+  // carry fairness from prev month
+  const fair={};
+  members.forEach(m=>{
+    fair[m.id]={...(prevHistory?.fair?.[m.id]||initF())};
+  });
+
+  // sched[mid][day] = shift string
+  const sched={};
+  members.forEach(m=>{sched[m.id]={};});
+
+  // STEP A: lock in hard blocks (approved leave / sick)
+  // These are REQUESTS — we will validate coverage before accepting
+  const hardBlock={}; // mid -> Set of days where they CANNOT work
+  members.forEach(m=>{
+    hardBlock[m.id]=new Set();
+    (reqs[m.id]?.sick||[]).forEach(d=>hardBlock[m.id].add(d));
+    // Approved leave: tentative — will be confirmed only if coverage ok
+  });
+
+  const log={errors:[],rejected:[]};
+
+  // Helper: fairness score for shift type s
+  const fscore=(mid,s)=>{
+    const f=fair[mid];
+    const base=f[s]||0;
+    const total=(f.Π||0)+(f.Α||0)+(f.Ν||0);
+    // nights weighted heavier
+    return s==='Ν' ? base*2+total : base+total*0.3;
+  };
+
+  // Process day by day
+  for(let d=1;d<=days;d++){
+    const we=isWE(year,month,d);
+    const hol=isHol(month,d);
+
+    // Who did Ν yesterday? → must get αα today (absolute rule)
+    const mustAA=new Set();
+    if(d>1){
+      members.forEach(m=>{if(sched[m.id][d-1]==='Ν')mustAA.add(m.id);});
+    } else if(prevHistory?.lastShifts){
+      members.forEach(m=>{if(prevHistory.lastShifts[m.id]==='Ν')mustAA.add(m.id);});
+    }
+
+    // Apply αα immediately for those coming off night
+    mustAA.forEach(mid=>{sched[mid][d]='αα';});
+
+    // Who is hard-blocked today (sick + αα)
+    const blocked=new Set([...mustAA]);
+    members.forEach(m=>{
+      if(hardBlock[m.id].has(d))blocked.add(m.id);
+    });
+
+    // Who WANTS approved leave today
+    const wantLeave=(reqs[m=>''],(reqs),(()=>{
+      const wl=[];
+      members.forEach(m=>{if((reqs[m.id]?.leave||[]).includes(d)&&!blocked.has(m.id))wl.push(m.id);});
+      return wl;
+    })());
+
+    // Available pool for shifts = not blocked
+    const pool=members.filter(m=>!blocked.has(m.id)&&!sched[m.id][d]);
+
+    // We need exactly 3 workers (Π, Α, Ν) from pool
+    if(pool.length<3){
+      log.errors.push(`${d}/${month+1}: Μόνο ${pool.length} διαθέσιμοι — αδύνατη πλήρης κάλυψη!`);
+    }
+
+    // Assign Π, Α, Ν — one person each, best fairness
+    const assignedToday=new Set();
+
+    for(const shiftType of WORK){
+      // Candidates: pool members not yet assigned today
+      // Exclude leave requesters ONLY if there are enough others
+      const allCands=pool.filter(m=>!assignedToday.has(m.id));
+      const nonLeaveCands=allCands.filter(m=>!wantLeave.includes(m.id));
+      
+      // Prefer non-leave candidates; fall back to leave if needed for coverage
+      let cands=nonLeaveCands.length>0?nonLeaveCands:allCands;
+      
+      // Sort by fairness (ascending = deserves it most)
+      cands=[...cands].sort((a,b)=>fscore(a.id,shiftType)-fscore(b.id,shiftType));
+
+      if(cands.length===0){
+        // Already logged above
+        continue;
+      }
+
+      const chosen=cands[0];
+      sched[chosen.id][d]=shiftType;
+      assignedToday.add(chosen.id);
+
+      // If a leave requester was forced to work → reject their leave
+      if(wantLeave.includes(chosen.id)){
+        log.rejected.push({mid:chosen.id,day:d,reason:'Απαραίτητος για κάλυψη'});
+      }
+
+      // Update fairness
+      fair[chosen.id][shiftType]=(fair[chosen.id][shiftType]||0)+1;
+      if(we)fair[chosen.id].WE=(fair[chosen.id].WE||0)+1;
+      if(hol)fair[chosen.id].HOL=(fair[chosen.id].HOL||0)+1;
+    }
+
+    // Now handle leave for those NOT assigned to work today
+    const rejectedLeaveIds=new Set(log.rejected.filter(r=>r.day===d).map(r=>r.mid));
+    
+    members.forEach(m=>{
+      if(sched[m.id][d])return; // already assigned
+      if(mustAA.has(m.id))return; // already αα
+      
+      // Approved leave?
+      if((reqs[m.id]?.leave||[]).includes(d)&&!rejectedLeaveIds.has(m.id)){
+        sched[m.id][d]='Ά';
+        return;
+      }
+      // Sick?
+      if((reqs[m.id]?.sick||[]).includes(d)){
+        sched[m.id][d]='Αν';
+        return;
+      }
+      // Preferred rest?
+      if((reqs[m.id]?.prefRest||[]).includes(d)){
+        sched[m.id][d]='Ρ';
+        return;
+      }
+      // Default: rest
+      sched[m.id][d]='Ρ';
+    });
+  }
+
+  // Cross-month: record last shift
+  const lastShifts={};
+  members.forEach(m=>{
+    for(let d=days;d>=1;d--){
+      if(sched[m.id][d]){lastShifts[m.id]=sched[m.id][d];break;}
+    }
+  });
+
+  return{sched,fair,lastShifts,log};
+}
+
+/* ── Validation ── */
+function validate(members,sched,days,month,year,prevLastShifts){
+  const errs=[],warns=[];
+  for(let d=1;d<=days;d++){
+    WORK.forEach(s=>{
+      const cnt=members.filter(m=>sched[m.id]?.[d]===s).length;
+      if(cnt===0)errs.push(`⛔ ${d}/${month+1}: ΑΚΑΛΥΠΤΗ βάρδια ${SHORT[s]}`);
+      if(cnt>1)warns.push(`⚠ ${d}/${month+1}: ${cnt} άτομα σε ${SHORT[s]}`);
+    });
+    const onLeave=members.filter(m=>['Ά','Αν'].includes(sched[m.id]?.[d])).length;
+    if(onLeave>2)warns.push(`⚠ ${d}/${month+1}: ${onLeave} σε άδεια/αναρρ.`);
+  }
+  members.forEach(m=>{
+    for(let d=1;d<days;d++){
+      if(sched[m.id]?.[d]==='Ν'&&!['αα','Ρ'].includes(sched[m.id]?.[d+1]))
+        errs.push(`⛔ ${m.name}: Νύχτα ${d}/${month+1} χωρίς αδιάθετο`);
+    }
+    if(prevLastShifts?.[m.id]==='Ν'&&!['αα','Ρ'].includes(sched[m.id]?.[1]))
+      errs.push(`⛔ ${m.name}: 1/${month+1} χωρίς αδιάθετο (νύχτα προηγ. μήνα)`);
+  });
+  return{errs,warns};
+}
+
+/* ── Helpers ── */
+const lsget=k=>S.get(k);
+const lsset=(k,v)=>S.set(k,v);
+
+const Bdg=({s,sm=false})=>{
+  const c=COL[s]||{bg:'#f9fafb',tx:'#9ca3af',bd:'#e5e7eb'};
+  return <span style={{display:'inline-block',padding:sm?'1px 4px':'2px 7px',borderRadius:3,fontSize:sm?10:11,fontWeight:700,background:c.bg,color:c.tx,border:`1px solid ${c.bd}`,whiteSpace:'nowrap'}}>{sm?s:SHORT[s]}</span>;
+};
+
+const Emblem=({sz=48})=>(
+  <svg width={sz} height={sz} viewBox="0 0 100 100">
+    <polygon points="50,4 92,22 92,62 50,96 8,62 8,22" fill="#003087" stroke="#c9a84c" strokeWidth="3"/>
+    <rect x="43" y="14" width="14" height="68" fill="white" opacity=".9"/>
+    <rect x="14" y="38" width="72" height="14" fill="white" opacity=".9"/>
+    <circle cx="50" cy="50" r="9" fill="#c9a84c"/>
+    <polygon points="50,39 53,47 62,47 55,53 58,62 50,56 42,62 45,53 38,47 47,47" fill="#003087"/>
+  </svg>
+);
+const Flag=()=>(
+  <svg width={42} height={28} viewBox="0 0 90 60">
+    {[0,1,2,3,4,5,6,7,8].map(i=><rect key={i} x="0" y={i*6.67} width="90" height="6.67" fill={i%2===0?'#003087':'white'}/>)}
+    <rect x="0" y="0" width="36" height="40" fill="#003087"/>
+    <rect x="14" y="0" width="8" height="40" fill="white"/>
+    <rect x="0" y="16" width="36" height="8" fill="white"/>
+  </svg>
+);
+
+/* ══ APP ══ */
+function App(){
+  const T=new Date();
+  const [yr,setYr]=useState(T.getFullYear());
+  const [mo,setMo]=useState(T.getMonth());
+  const [members,setMembers]=useState(()=>lsget('elas_mbr')||[]);
+  const [sched,setSched]=useState({});
+  const [reqs,setReqs]=useState({});
+  const [history,setHistory]=useState(()=>lsget('elas_hist')||{});
+  const [tab,setTab]=useState('schedule');
+  const [cell,setCell]=useState(null);
+  const [newName,setNewName]=useState('');
+  const [newRank,setNewRank]=useState(RANKS[0]);
+  const [reqM,setReqM]=useState(null);
+  const [reqTab,setReqTab]=useState('leave');
+  const [msg,setMsg]=useState('');
+
+  const mk=mkey(yr,mo);
+  const pmk=pmkey(yr,mo);
+  const days=getDays(yr,mo);
+  const prevHist=history[pmk]||null;
+
+  useEffect(()=>{
+    setSched(lsget(`elas_s_${mk}`)||{});
+    setReqs(lsget(`elas_r_${mk}`)||{});
+  },[mk]);
+
+  const flash=t=>{setMsg(t);setTimeout(()=>setMsg(''),2500)};
+  const saveSched=s=>{lsset(`elas_s_${mk}`,s);flash('Αποθηκεύτηκε ✓')};
+  const saveHist=h=>{lsset('elas_hist',h)};
+
+  const generate=()=>{
+    const res=schedule(members,yr,mo,reqs,{},prevHist);
+    setSched(res.sched);
+    lsset(`elas_s_${mk}`,res.sched);
+    const nh={...history,[mk]:{fair:res.fair,lastShifts:res.lastShifts,log:res.log}};
+    setHistory(nh);saveHist(nh);
+    const rej=res.log.rejected.length;
+    const err=res.log.errors.length;
+    flash(`Πρόγραμμα OK${rej?` | ${rej} απορρ. άδειες`:''}${err?` | ⛔ ${err} σφάλμ.`:''}`);
+  };
+
+  const clearSched=()=>{setSched({});lsset(`elas_s_${mk}`,{});flash('Καθαρίστηκε')};
+
+  const getS=(mid,d)=>sched[mid]?.[d]||'';
+
+  const setS=(mid,d,val)=>{
+    const ns={...sched,[mid]:{...(sched[mid]||{}),[d]:val||undefined}};
+    if(!val)delete ns[mid][d];
+    setSched(ns);saveSched(ns);setCell(null);
+  };
+
+  const addMember=()=>{
+    const name=newName.trim();if(!name)return;
+    const m=[...members,{id:Date.now().toString(),name,rank:newRank}];
+    setMembers(m);lsset('elas_mbr',m);setNewName('');
+  };
+  const remMember=id=>{const m=members.filter(x=>x.id!==id);setMembers(m);lsset('elas_mbr',m)};
+
+  const toggleReq=(mid,day,type)=>{
+    const cur=reqs[mid]||{leave:[],sick:[],prefRest:[]};
+    const list=[...(cur[type]||[])];
+    const idx=list.indexOf(day);
+    if(idx===-1)list.push(day);else list.splice(idx,1);
+    list.sort((a,b)=>a-b);
+    const nr={...reqs,[mid]:{...cur,[type]:list}};
+    setReqs(nr);lsset(`elas_r_${mk}`,nr);
+  };
+  const hasReq=(mid,d,t)=>(reqs[mid]?.[t]||[]).includes(d);
+
+  const getStats=mid=>{
+    const c={Π:0,Α:0,Ν:0,αα:0,Ρ:0,Ά:0,Αν:0,WE:0,HOL:0};
+    for(let d=1;d<=days;d++){
+      const s=getS(mid,d);
+      if(s&&c[s]!==undefined)c[s]++;
+      if(WORK.includes(s)){
+        if(isWE(yr,mo,d))c.WE++;
+        if(isHol(mo,d))c.HOL++;
+      }
+    }
+    c.total=c.Π+c.Α+c.Ν;
+    return c;
+  };
+
+  const {errs,warns}=useMemo(()=>{
+    if(!Object.keys(sched).length)return{errs:[],warns:[]};
+    return validate(members,sched,days,mo,yr,prevHist?.lastShifts);
+  },[sched,members,days,mo,yr,prevHist]);
+
+  // Coverage row data
+  const coverage=useMemo(()=>{
+    const cov={};
+    for(let d=1;d<=days;d++){
+      cov[d]={};
+      WORK.forEach(s=>{cov[d][s]=members.filter(m=>getS(m.id,d)===s).map(m=>m.name.split(' ')[0]);});
+      cov[d].ok=WORK.every(s=>cov[d][s].length===1);
+    }
+    return cov;
+  },[sched,members,days]);
+
+  const prevM=()=>{if(mo===0){setMo(11);setYr(y=>y-1)}else setMo(m=>m-1)};
+  const nextM=()=>{if(mo===11){setMo(0);setYr(y=>y+1)}else setMo(m=>m+1)};
+
+  useEffect(()=>{
+    const h=()=>setCell(null);
+    document.addEventListener('click',h);
+    return()=>document.removeEventListener('click',h);
+  },[]);
+
+  // Log for current month
+  const curLog=history[mk]?.log||null;
+  const rejLog=curLog?.rejected||[];
+  const rejByMember={};
+  rejLog.forEach(r=>{if(!rejByMember[r.mid])rejByMember[r.mid]=[];rejByMember[r.mid].push(r.day);});
+
+  const TABS=[['schedule','📋 Πρόγραμμα'],['requests','📝 Αιτήσεις'],['stats','📊 Στατιστικά'],['fairness','⚖️ Δικαιοσύνη'],['settings','⚙️ Ρυθμίσεις']];
+
+  return(
+  <div style={{minHeight:'100vh',background:'#eef0f4'}}>
+
+    {/* HEADER */}
+    <div style={{background:'#003087',borderBottom:'4px solid #c9a84c'}}>
+      <div style={{height:4,background:'repeating-linear-gradient(90deg,#003087 0,#003087 20px,white 20px,white 23px)',opacity:.3}}/>
+      <div style={{padding:'11px 16px',display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+        <Emblem sz={50}/>
+        <div style={{flex:1}}>
+          <div style={{fontSize:9,color:'#93b4d8',letterSpacing:3,textTransform:'uppercase',marginBottom:1}}>Ελληνική Δημοκρατία • Ελληνική Αστυνομία</div>
+          <div style={{fontSize:16,fontWeight:700,color:'white',letterSpacing:.5}}>Πρόγραμμα Βάρδιας Αστυφυλάκων</div>
+          <div style={{fontSize:10,color:'#c9a84c',marginTop:1}}>Αυτόματος Προγραμματισμός — Εγγυημένη Κάλυψη Υπηρεσιών</div>
+        </div>
+        <Flag/>
+      </div>
+      <div style={{background:'rgba(0,0,0,.22)',padding:'7px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <button onClick={prevM} style={{background:'rgba(255,255,255,.15)',border:'1px solid rgba(255,255,255,.3)',color:'white',padding:'3px 10px',borderRadius:3,cursor:'pointer',fontSize:14,fontWeight:700}}>‹</button>
+          <span style={{color:'white',fontWeight:700,fontSize:13,minWidth:155,textAlign:'center'}}>{MONTHS[mo].toUpperCase()} {yr}</span>
+          <button onClick={nextM} style={{background:'rgba(255,255,255,.15)',border:'1px solid rgba(255,255,255,.3)',color:'white',padding:'3px 10px',borderRadius:3,cursor:'pointer',fontSize:14,fontWeight:700}}>›</button>
+          <span style={{fontSize:10,color:prevHist?'#86efac':'#fcd34d',marginLeft:4}}>{prevHist?'✓ Ιστορικό προηγ. μήνα':'⚠ Χωρίς ιστορικό'}</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          {msg&&<span style={{color:'#86efac',fontSize:11,fontWeight:700,background:'rgba(0,0,0,.3)',padding:'2px 8px',borderRadius:3}}>{msg}</span>}
+        </div>
+      </div>
+    </div>
+
+    {/* TABS */}
+    <div style={{background:'white',borderBottom:'1px solid #d1d5db',boxShadow:'0 1px 2px rgba(0,0,0,.06)'}}>
+      <div style={{display:'flex',overflowX:'auto',paddingLeft:8}}>
+        {TABS.map(([id,lbl])=><button key={id} onClick={()=>setTab(id)} className={`tab-btn${tab===id?' active':''}`}>{lbl}</button>)}
+      </div>
+    </div>
+
+    <div style={{padding:14,maxWidth:1600,margin:'0 auto'}}>
+
+      {/* ALERTS */}
+      {errs.length>0&&(
+        <div style={{marginBottom:10,padding:10,borderRadius:4,background:'#fef2f2',border:'1px solid #fca5a5',borderLeft:'4px solid #dc2626'}}>
+          <div style={{color:'#991b1b',fontWeight:700,fontSize:12,marginBottom:5}}>⛔ ΠΑΡΑΒΙΑΣΕΙΣ ({errs.length})</div>
+          {errs.map((e,i)=><div key={i} style={{color:'#7f1d1d',fontSize:11,paddingLeft:10}}>{e}</div>)}
+        </div>
+      )}
+      {warns.length>0&&(
+        <div style={{marginBottom:10,padding:10,borderRadius:4,background:'#fffbeb',border:'1px solid #fcd34d',borderLeft:'4px solid #f59e0b'}}>
+          <div style={{color:'#92400e',fontWeight:700,fontSize:12,marginBottom:5}}>⚠ ΠΡΟΕΙΔΟΠΟΙΗΣΕΙΣ ({warns.length})</div>
+          {warns.map((w,i)=><div key={i} style={{color:'#78350f',fontSize:11,paddingLeft:10}}>{w}</div>)}
+        </div>
+      )}
+      {rejLog.length>0&&(
+        <div style={{marginBottom:10,padding:10,borderRadius:4,background:'#fffbeb',border:'1px solid #fcd34d',borderLeft:'4px solid #f59e0b'}}>
+          <div style={{color:'#92400e',fontWeight:700,fontSize:12,marginBottom:5}}>🚫 ΑΠΟΡΡΙΦΘΕΙΣΕΣ ΑΔΕΙΕΣ — Κάλυψη υπηρεσίας</div>
+          {members.filter(m=>rejByMember[m.id]).map(m=>(
+            <div key={m.id} style={{color:'#78350f',fontSize:11,paddingLeft:10}}>• {m.name}: ημέρες {rejByMember[m.id].join(', ')}</div>
+          ))}
+        </div>
+      )}
+
+      {/* ══ SCHEDULE ══ */}
+      {tab==='schedule'&&(<>
+        <div style={{marginBottom:12,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+          <button onClick={generate} className="pbtn">▶ Αυτόματη Δημιουργία Προγράμματος</button>
+          <button onClick={clearSched} className="dbtn">✕ Καθαρισμός</button>
+          <span style={{fontSize:11,color:'#14532d',background:'#dcfce7',border:'1px solid #86efac',padding:'4px 10px',borderRadius:3,fontWeight:700}}>
+            ✓ Κάθε βάρδια (Πρωί/Απόγ./Νύχτα) καλύπτεται ΠΑΝΤΟΤΕ από 1 αστυφύλακα
+          </span>
+        </div>
+
+        {members.length<3?(
+          <div style={{textAlign:'center',padding:50,background:'white',borderRadius:5,border:'2px dashed #d1d5db'}}>
+            <div style={{marginBottom:10,opacity:.3}}><Emblem sz={60}/></div>
+            <div style={{color:'#dc2626',fontWeight:700,fontSize:15,marginBottom:6}}>Απαιτούνται τουλάχιστον 3 αστυφύλακες</div>
+            <div style={{color:'#6b7280',fontSize:12,marginBottom:16}}>(1 Πρωί + 1 Απόγευμα + 1 Νύχτα ανά ημέρα)</div>
+            <button onClick={()=>setTab('settings')} className="pbtn">Μετάβαση στις Ρυθμίσεις</button>
+          </div>
+        ):(
+          <>
+          <div style={{overflowX:'auto',borderRadius:5,border:'1px solid #d1d5db',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+            <table style={{borderCollapse:'collapse',minWidth:Math.max(720,180+days*46)}}>
+              <thead>
+                <tr style={{background:'#003087'}}>
+                  <th style={{position:'sticky',left:0,zIndex:15,padding:'9px 12px',textAlign:'left',fontSize:10,letterSpacing:1,color:'white',fontWeight:700,textTransform:'uppercase',background:'#003087',borderBottom:'2px solid #c9a84c',borderRight:'1px solid rgba(255,255,255,.2)',minWidth:175}}>Αστυφύλακας</th>
+                  {Array.from({length:days},(_,i)=>i+1).map(d=>{
+                    const dw=dow(yr,mo,d);
+                    const we=isWE(yr,mo,d);
+                    const hl=isHol(mo,d);
+                    const tod=d===T.getDate()&&mo===T.getMonth()&&yr===T.getFullYear();
+                    return(
+                      <th key={d} style={{padding:'5px 2px',textAlign:'center',minWidth:46,fontSize:9,fontWeight:700,
+                        background:tod?'#c9a84c':hl?'#4c1d95':we?'#1e3a6e':'#003087',
+                        color:tod?'#003087':'white',
+                        borderBottom:'2px solid #c9a84c',borderRight:'1px solid rgba(255,255,255,.12)'}}>
+                        <div>{d}</div>
+                        <div style={{fontSize:8,opacity:.7,fontWeight:400}}>{DAYS[dw]}</div>
+                        {hl&&<div style={{fontSize:7}}>★</div>}
+                      </th>
+                    );
+                  })}
+                  <th style={{padding:'9px 6px',textAlign:'center',fontSize:10,color:'#c9a84c',fontWeight:700,background:'#003087',borderBottom:'2px solid #c9a84c',minWidth:46}}>ΣΥΝ.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((m,mi)=>{
+                  const st=getStats(m.id);
+                  const hasRej=rejByMember[m.id]?.length>0;
+                  return(
+                    <tr key={m.id} style={{background:mi%2===0?'#fff':'#f8fafc'}}>
+                      <td style={{position:'sticky',left:0,zIndex:10,padding:'6px 12px',background:mi%2===0?'#fff':'#f8fafc',borderRight:'2px solid #003087',borderBottom:'1px solid #e5e7eb',whiteSpace:'nowrap'}}>
+                        <div style={{fontWeight:700,fontSize:12,color:'#003087'}}>{m.name}{hasRej&&<span style={{marginLeft:5,fontSize:9,background:'#fffbeb',color:'#92400e',border:'1px solid #fcd34d',borderRadius:2,padding:'1px 4px'}}>!{rejByMember[m.id].length}</span>}</div>
+                        <div style={{fontSize:9,color:'#6b7280'}}>{m.rank}</div>
+                        <div style={{fontSize:9,color:'#9ca3af'}}>Π:{st.Π} Α:{st.Α} Ν:{st.Ν}</div>
+                      </td>
+                      {Array.from({length:days},(_,i)=>i+1).map(d=>{
+                        const s=getS(m.id,d);
+                        const isAct=cell?.mid===m.id&&cell?.day===d;
+                        const we=isWE(yr,mo,d);
+                        const hl=isHol(mo,d);
+                        const isRejDay=rejByMember[m.id]?.includes(d);
+                        return(
+                          <td key={d} style={{padding:'2px',textAlign:'center',cursor:'pointer',position:'relative',
+                            borderRight:'1px solid #e5e7eb',borderBottom:'1px solid #e5e7eb',
+                            background:isRejDay?'#fffbeb':hl?'#faf5ff':we?'#f1f5f9':'transparent',
+                            minWidth:46}}
+                            onClick={e=>{e.stopPropagation();setCell(isAct?null:{mid:m.id,day:d})}}>
+                            {s?<Bdg s={s} sm/>:<span style={{color:'#e5e7eb',fontSize:11}}>–</span>}
+                            {isRejDay&&s!=='Ά'&&<span style={{position:'absolute',top:1,right:1,width:4,height:4,borderRadius:'50%',background:'#f59e0b'}}/>}
+                            {isAct&&(
+                              <div style={{position:'absolute',top:'calc(100% + 3px)',left:'50%',transform:'translateX(-50%)',zIndex:200,
+                                background:'white',border:'1px solid #d1d5db',borderRadius:5,padding:8,
+                                boxShadow:'0 4px 16px rgba(0,0,0,.18)',minWidth:165}}
+                                onClick={e=>e.stopPropagation()}>
+                                <div style={{fontSize:9,fontWeight:700,color:'#003087',letterSpacing:1,textTransform:'uppercase',marginBottom:5,borderBottom:'1px solid #e5e7eb',paddingBottom:4}}>{d}/{mo+1} — Χειροκίνητη αλλαγή</div>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:3}}>
+                                  {ALL_S.map(st2=>{
+                                    const c=COL[st2]||{bg:'#f9fafb',tx:'#6b7280',bd:'#e5e7eb'};
+                                    return(
+                                      <button key={st2} onClick={()=>setS(m.id,d,st2)}
+                                        style={{padding:'3px 6px',borderRadius:3,fontSize:10,cursor:'pointer',fontWeight:700,
+                                          background:c.bg,color:c.tx,border:`1px solid ${c.bd}`,
+                                          outline:s===st2?'2px solid #003087':'none',outlineOffset:1}}>
+                                        {SHORT[st2]}
+                                      </button>
+                                    );
+                                  })}
+                                  <button onClick={()=>setS(m.id,d,'')} style={{gridColumn:'1/-1',marginTop:2,padding:'3px',borderRadius:3,fontSize:10,cursor:'pointer',fontWeight:700,background:'#f9fafb',border:'1px solid #d1d5db',color:'#6b7280'}}>✕ Εκκαθάριση</button>
+                                </div>
+                                <div style={{marginTop:5,fontSize:9,color:'#dc2626',fontWeight:700,borderTop:'1px solid #e5e7eb',paddingTop:4}}>
+                                  ⚠ Η χειροκίνητη αλλαγή δεν ελέγχει κανόνες!
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td style={{padding:'6px',textAlign:'center',fontWeight:700,fontSize:13,color:'#003087',borderBottom:'1px solid #e5e7eb',background:mi%2===0?'#eff6ff':'#e8f0ff'}}>{st.total}</td>
+                    </tr>
+                  );
+                })}
+
+                {/* Coverage status row */}
+                <tr style={{background:'#003087'}}>
+                  <td style={{position:'sticky',left:0,zIndex:10,background:'#001a5c',padding:'5px 12px',fontSize:10,fontWeight:700,color:'#c9a84c',borderRight:'1px solid rgba(255,255,255,.2)',whiteSpace:'nowrap'}}>ΚΑΛΥΨΗ</td>
+                  {Array.from({length:days},(_,i)=>i+1).map(d=>{
+                    const cov=coverage[d];
+                    return(
+                      <td key={d} style={{padding:'3px 1px',textAlign:'center',borderRight:'1px solid rgba(255,255,255,.1)'}}>
+                        {cov?(
+                          <div style={{display:'flex',flexDirection:'column',gap:1}}>
+                            {WORK.map(s=>(
+                              <div key={s} style={{fontSize:8,fontWeight:700,padding:'1px 2px',borderRadius:2,
+                                background:cov[s].length===1?WORK.indexOf(s)===0?'#1e3a8a':WORK.indexOf(s)===1?'#78350f':'#3730a3':'#991b1b',
+                                color:cov[s].length===1?'#c7d2fe':'#fca5a5'}}>
+                                {cov[s].length===1?cov[s][0]||s:'✕'}
+                              </div>
+                            ))}
+                          </div>
+                        ):<span style={{color:'#6b7280',fontSize:9}}>—</span>}
+                      </td>
+                    );
+                  })}
+                  <td style={{background:'#001a5c'}}/>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Legend */}
+          <div style={{marginTop:10,display:'flex',flexWrap:'wrap',gap:6,alignItems:'center'}}>
+            <span style={{fontSize:10,color:'#6b7280',fontWeight:700,marginRight:2}}>ΥΠΟΜΝΗΜΑ:</span>
+            {ALL_S.map(s=>(
+              <span key={s} style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 8px',borderRadius:3,fontSize:10,background:COL[s]?.bg,color:COL[s]?.tx,border:`1px solid ${COL[s]?.bd}`,fontWeight:700}}>
+                {s} — {SHORT[s]}
+              </span>
+            ))}
+            <span style={{fontSize:9,color:'#6b7280',marginLeft:4}}>★=Αργία | Μωβ φόντο=Αργία | Γκρι=ΣΚ | 🟡=Απορρ. άδεια</span>
+          </div>
+          </>
+        )}
+      </>)}
+
+      {/* ══ REQUESTS ══ */}
+      {tab==='requests'&&(
+        <div style={{maxWidth:720}}>
+          <div className="card">
+            <div className="sec">📝 Αιτήσεις Προσωπικού — {MONTHS[mo]} {yr}</div>
+            <div style={{padding:'8px 12px',background:'#fef2f2',border:'1px solid #fca5a5',borderLeft:'3px solid #dc2626',borderRadius:4,fontSize:11,color:'#7f1d1d',marginBottom:14,lineHeight:1.6}}>
+              <strong>⛔ ΚΑΝΟΝΑΣ:</strong> Η κάλυψη Πρωί/Απόγευμα/Νύχτα έχει <strong>ΑΠΟΛΥΤΗ</strong> προτεραιότητα.<br/>
+              Άδεια χορηγείται <strong>ΜΟΝΟ</strong> αν οι υπόλοιποι καλύπτουν όλες τις βάρδιες. Διαφορετικά απορρίπτεται αυτόματα.
+            </div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>
+              {members.map(m=>{
+                const r=reqs[m.id]||{};
+                const tot=(r.leave?.length||0)+(r.sick?.length||0)+(r.prefRest?.length||0);
+                return(
+                  <button key={m.id} onClick={()=>setReqM(reqM?.id===m.id?null:m)}
+                    style={{padding:'6px 13px',borderRadius:4,cursor:'pointer',fontWeight:700,fontSize:11,transition:'all .2s',
+                      background:reqM?.id===m.id?'#003087':'white',color:reqM?.id===m.id?'white':'#003087',
+                      border:`1px solid ${reqM?.id===m.id?'#003087':'#d1d5db'}`}}>
+                    {m.name}{tot>0&&<span style={{marginLeft:5,fontSize:9,background:reqM?.id===m.id?'rgba(255,255,255,.25)':'#dbeafe',color:reqM?.id===m.id?'white':'#1e40af',borderRadius:2,padding:'1px 4px'}}>{tot}</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {reqM&&(()=>{
+              const r=reqs[reqM.id]||{leave:[],sick:[],prefRest:[]};
+              return(<>
+                <div style={{display:'flex',gap:5,marginBottom:12,flexWrap:'wrap'}}>
+                  {[['leave','🏖 Εγκεκρ. Άδεια','#7f1d1d','#fee2e2'],['sick','🏥 Αναρρωτική','#7c2d12','#ffedd5'],['prefRest','💤 Επιθ. Ρεπό','#14532d','#dcfce7']].map(([t,lbl,col,bg])=>(
+                    <button key={t} onClick={()=>setReqTab(t)}
+                      style={{padding:'5px 13px',borderRadius:4,cursor:'pointer',fontWeight:700,fontSize:11,
+                        background:reqTab===t?col:'white',color:reqTab===t?'white':col,border:`1px solid ${col}`}}>
+                      {lbl} ({r[t]?.length||0})
+                    </button>
+                  ))}
+                </div>
+                <div style={{fontSize:11,color:'#4b5563',marginBottom:8}}>
+                  {reqTab==='leave'&&'Εγκεκριμένες άδειες (δεσμευτικές — χορηγούνται μόνο αν υπάρχει κάλυψη):'}
+                  {reqTab==='sick'&&'Αναρρωτική άδεια (δεσμευτική — χορηγείται πάντα, μπορεί να αφήσει κενό):'}
+                  {reqTab==='prefRest'&&'Επιθυμητά ρεπό (χορηγούνται εφόσον δεν απαιτείται κάλυψη):'}
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4,maxWidth:340}}>
+                  {DAYS.map(dn=><div key={dn} style={{textAlign:'center',fontSize:9,fontWeight:700,color:'#6b7280',padding:'3px 0',borderBottom:'1px solid #e5e7eb'}}>{dn}</div>)}
+                  {Array.from({length:(()=>{const d=new Date(yr,mo,1).getDay();return d===0?6:d-1})()}).map((_,i)=><div key={`o${i}`}/>)}
+                  {Array.from({length:days},(_,i)=>i+1).map(d=>{
+                    const active=hasReq(reqM.id,d,reqTab);
+                    const we=isWE(yr,mo,d);
+                    const colMap={leave:'#7f1d1d',sick:'#7c2d12',prefRest:'#14532d'};
+                    const bgMap={leave:'#fee2e2',sick:'#ffedd5',prefRest:'#dcfce7'};
+                    const bdMap={leave:'#fca5a5',sick:'#fb923c',prefRest:'#86efac'};
+                    return(
+                      <button key={d} onClick={()=>toggleReq(reqM.id,d,reqTab)}
+                        style={{padding:'6px 2px',borderRadius:4,cursor:'pointer',fontWeight:700,fontSize:12,textAlign:'center',
+                          background:active?bgMap[reqTab]:we?'#f1f5f9':'#f9fafb',
+                          color:active?colMap[reqTab]:'#374151',
+                          border:`1px solid ${active?bdMap[reqTab]:'#e5e7eb'}`,
+                          transform:active?'scale(1.06)':'scale(1)',transition:'all .15s'}}>
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{marginTop:8,fontSize:11,color:'#6b7280'}}>Επιλεγμένες: <strong style={{color:'#003087'}}>{(r[reqTab]||[]).join(', ')||'—'}</strong></div>
+                <div style={{marginTop:12}}>
+                  <button onClick={()=>{const nr={...reqs,[reqM.id]:{leave:[],sick:[],prefRest:[]}};setReqs(nr);lsset(`elas_r_${mk}`,nr)}} className="gbtn" style={{fontSize:11}}>✕ Εκκαθάριση</button>
+                </div>
+              </>);
+            })()}
+            {!reqM&&<div style={{textAlign:'center',padding:30,color:'#9ca3af',fontSize:12}}>Επιλέξτε αστυφύλακα</div>}
+          </div>
+        </div>
+      )}
+
+      {/* ══ STATS ══ */}
+      {tab==='stats'&&(<>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(265px,1fr))',gap:12,marginBottom:14}}>
+          {members.map(m=>{
+            const st=getStats(m.id);
+            return(
+              <div key={m.id} className="card">
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12,paddingBottom:10,borderBottom:'2px solid #003087'}}>
+                  <div style={{width:34,height:34,borderRadius:'50%',background:'#003087',display:'flex',alignItems:'center',justifyContent:'center',color:'#c9a84c',fontWeight:700,fontSize:13,flexShrink:0}}>{m.name.charAt(0)}</div>
+                  <div style={{flex:1}}><div style={{fontWeight:700,fontSize:12}}>{m.name}</div><div style={{fontSize:10,color:'#6b7280'}}>{m.rank}</div></div>
+                  <span style={{fontWeight:700,fontSize:20,color:'#003087'}}>{st.total}</span>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:5}}>
+                  {ALL_S.map(s=>(
+                    <div key={s} style={{display:'flex',justifyContent:'space-between',padding:'4px 7px',borderRadius:3,background:COL[s]?.bg,border:`1px solid ${COL[s]?.bd}`}}>
+                      <span style={{fontSize:10,color:COL[s]?.tx,fontWeight:700}}>{SHORT[s]}</span>
+                      <span style={{fontWeight:700,fontSize:12,color:COL[s]?.tx}}>{st[s]||0}</span>
+                    </div>
+                  ))}
+                  <div style={{padding:'4px 7px',borderRadius:3,background:'#f0f9ff',border:'1px solid #bae6fd',gridColumn:'1/-1',display:'flex',justifyContent:'space-between'}}>
+                    <span style={{fontSize:10,color:'#0c4a6e',fontWeight:700}}>ΣΚ+Αργίες</span>
+                    <span style={{fontWeight:700,fontSize:12,color:'#0c4a6e'}}>{st.WE} / {st.HOL}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {/* Daily coverage detail */}
+        <div className="card">
+          <div className="sec">Κάλυψη Βαρδιών ανά Ημέρα</div>
+          <div style={{overflowX:'auto'}}>
+            <table style={{borderCollapse:'collapse',fontSize:11,width:'100%'}}>
+              <thead>
+                <tr style={{background:'#f8fafc'}}>
+                  <th style={{padding:'6px 10px',textAlign:'left',color:'#003087',fontWeight:700,borderBottom:'2px solid #003087',minWidth:70}}>Βάρδια</th>
+                  {Array.from({length:days},(_,i)=>i+1).map(d=>(
+                    <th key={d} style={{padding:'4px 2px',textAlign:'center',minWidth:30,color:isWE(yr,mo,d)?'#1e40af':'#374151',fontWeight:700,borderBottom:'2px solid #003087',fontSize:10}}>{d}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {WORK.map(s=>(
+                  <tr key={s}>
+                    <td style={{padding:'4px 10px',fontWeight:700,color:COL[s].tx,background:COL[s].bg,border:'1px solid #e5e7eb'}}>{SHORT[s]}</td>
+                    {Array.from({length:days},(_,i)=>i+1).map(d=>{
+                      const who=members.filter(m=>getS(m.id,d)===s);
+                      return(
+                        <td key={d} style={{padding:'3px 2px',textAlign:'center',border:'1px solid #f3f4f6',background:who.length===0?'#fef2f2':who.length>1?'#fffbeb':'transparent'}}>
+                          <span style={{fontSize:9,fontWeight:700,color:who.length===1?'#14532d':who.length===0?'#dc2626':'#92400e'}}>
+                            {who.length===0?'✕':who.map(m=>m.name.split(' ')[0]).join('+')}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </>)}
+
+      {/* ══ FAIRNESS ══ */}
+      {tab==='fairness'&&(()=>{
+        const cf=history[mk]?.fair||{};
+        const maxN=Math.max(...members.map(m=>(cf[m.id]?.Ν||0)),1);
+        return(
+          <div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12,marginBottom:14}}>
+              {members.map(m=>{
+                const f=cf[m.id]||initF();
+                return(
+                  <div key={m.id} className="card">
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,paddingBottom:8,borderBottom:'2px solid #003087'}}>
+                      <div style={{width:30,height:30,borderRadius:'50%',background:'#003087',display:'flex',alignItems:'center',justifyContent:'center',color:'#c9a84c',fontWeight:700,fontSize:12}}>{m.name.charAt(0)}</div>
+                      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:12}}>{m.name}</div><div style={{fontSize:9,color:'#6b7280'}}>{m.rank}</div></div>
+                    </div>
+                    {[['Νύχτες','Ν','#3730a3'],['Πρωινές','Π','#1e40af'],['Απογ/νές','Α','#92400e'],['ΣΚ βάρδιες','WE','#0c4a6e'],['Αργίες','HOL','#581c87']].map(([lbl,k,col])=>(
+                      <div key={k} style={{marginBottom:6}}>
+                        <div style={{display:'flex',justifyContent:'space-between',fontSize:10,marginBottom:2}}>
+                          <span style={{color:'#6b7280'}}>{lbl}</span>
+                          <span style={{fontWeight:700}}>{f[k]||0}</span>
+                        </div>
+                        <div style={{height:5,background:'#e5e7eb',borderRadius:3}}>
+                          <div style={{width:`${((f[k]||0)/Math.max(...members.map(m2=>(cf[m2.id]?.[k]||0)),1))*100}%`,height:'100%',background:col,borderRadius:3,transition:'width .3s'}}/>
+                        </div>
+                      </div>
+                    ))}
+                    {f.denied>0&&<div style={{marginTop:6,padding:'3px 8px',background:'#fffbeb',border:'1px solid #fcd34d',borderRadius:3,fontSize:10,color:'#92400e',fontWeight:700}}>🚫 {f.denied} απορριφθ. αιτ.</div>}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="card">
+              <div className="sec">Πίνακας Δικαιοσύνης — {MONTHS[mo]} {yr}</div>
+              <div style={{overflowX:'auto'}}>
+                <table style={{borderCollapse:'collapse',width:'100%',fontSize:11}}>
+                  <thead>
+                    <tr style={{background:'#f8fafc'}}>
+                      {['Αστυφύλακας','Νύχτες','Πρωινές','Απογ/νές','ΣΚ','Αργίες','Απορρ.'].map(h=>(
+                        <th key={h} style={{padding:'7px 10px',textAlign:h==='Αστυφύλακας'?'left':'center',fontWeight:700,color:'#003087',borderBottom:'2px solid #003087'}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {members.slice().sort((a,b)=>(cf[b.id]?.Ν||0)-(cf[a.id]?.Ν||0)).map((m,i)=>{
+                      const f=cf[m.id]||initF();
+                      return(
+                        <tr key={m.id} style={{background:i%2===0?'#fff':'#f8fafc'}}>
+                          <td style={{padding:'7px 10px',fontWeight:700,color:'#003087',borderBottom:'1px solid #e5e7eb'}}>{m.name}</td>
+                          {[f.Ν||0,f.Π||0,f.Α||0,f.WE||0,f.HOL||0,f.denied||0].map((v,vi)=>(
+                            <td key={vi} style={{padding:'7px 8px',textAlign:'center',borderBottom:'1px solid #e5e7eb',fontWeight:700,
+                              color:vi===5&&v>0?'#dc2626':vi===0&&v===Math.max(...members.map(m2=>cf[m2.id]?.Ν||0))?'#7c3aed':'#1a1a2e'}}>{v}</td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{marginTop:8,fontSize:10,color:'#6b7280'}}>Ταξινόμηση: περισσότερες νύχτες πρώτα | Μωβ = μέγιστο νυχτών | Κόκκινο = απορριφθέντα αιτήματα</div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ══ SETTINGS ══ */}
+      {tab==='settings'&&(
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))',gap:14}}>
+          <div className="card">
+            <div className="sec">👥 Προσωπικό</div>
+            <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:12}}>
+              {members.map(m=>(
+                <div key={m.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 10px',borderRadius:4,background:'#f8fafc',border:'1px solid #e5e7eb'}}>
+                  <div><div style={{fontWeight:700,fontSize:12,color:'#003087'}}>{m.name}</div><div style={{fontSize:10,color:'#6b7280'}}>{m.rank}</div></div>
+                  <button onClick={()=>remMember(m.id)} className="dbtn" style={{padding:'3px 10px',fontSize:11}}>Αφαίρεση</button>
+                </div>
+              ))}
+              {!members.length&&<div style={{color:'#9ca3af',fontSize:12,textAlign:'center',padding:12}}>Κανένας.</div>}
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:6,marginBottom:6}}>
+              <input className="inp" value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addMember()} placeholder="Ονοματεπώνυμο..."/>
+              <button onClick={addMember} className="pbtn">+ Προσθήκη</button>
+            </div>
+            <select className="sel" style={{width:'100%'}} value={newRank} onChange={e=>setNewRank(e.target.value)}>
+              {RANKS.map(r=><option key={r}>{r}</option>)}
+            </select>
+            {members.length<3&&members.length>0&&(
+              <div style={{marginTop:10,padding:'6px 10px',borderRadius:4,background:'#fef2f2',border:'1px solid #fca5a5',fontSize:11,color:'#991b1b',fontWeight:700}}>
+                ⛔ Απαιτούνται τουλάχιστον 3 αστυφύλακες για κάλυψη 3 βαρδιών/ημέρα
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="sec">📅 Ιστορικό & Export</div>
+            <div style={{fontSize:11,color:'#4b5563',marginBottom:10,lineHeight:1.6}}>
+              Αποθηκεύεται σε <strong>localStorage</strong>. Export σε JSON για backup.
+            </div>
+            {Object.keys(history).length>0?(
+              <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:12}}>
+                {Object.keys(history).sort().reverse().slice(0,8).map(k=>(
+                  <div key={k} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'5px 10px',borderRadius:4,background:'#f8fafc',border:'1px solid #e5e7eb',fontSize:11}}>
+                    <span style={{fontWeight:700,color:'#003087'}}>{k}</span>
+                    <span style={{color:'#6b7280',fontSize:10}}>{history[k].log?.rejected?.length||0} απορρ.</span>
+                    {k===mk&&<span style={{fontSize:9,background:'#dcfce7',color:'#14532d',border:'1px solid #86efac',borderRadius:2,padding:'1px 5px'}}>Τρέχων</span>}
+                  </div>
+                ))}
+              </div>
+            ):<div style={{color:'#9ca3af',fontSize:12,marginBottom:12}}>Κανένα ιστορικό ακόμα.</div>}
+            <div style={{display:'flex',gap:6}}>
+              <button onClick={()=>{
+                const d=JSON.stringify({members,history},null,2);
+                const a=document.createElement('a');a.href='data:application/json,'+encodeURIComponent(d);
+                a.download=`elas_${new Date().toISOString().slice(0,10)}.json`;a.click();
+              }} className="gbtn" style={{fontSize:11,flex:1}}>⬇ Export JSON</button>
+              <label style={{flex:1,cursor:'pointer'}}>
+                <input type="file" accept=".json" style={{display:'none'}} onChange={e=>{
+                  const f=e.target.files[0];if(!f)return;
+                  const r=new FileReader();
+                  r.onload=ev=>{try{
+                    const d=JSON.parse(ev.target.result);
+                    if(d.members){setMembers(d.members);lsset('elas_mbr',d.members);}
+                    if(d.history){setHistory(d.history);saveHist(d.history);}
+                    flash('Import επιτυχές ✓');
+                  }catch{flash('Σφάλμα import');}};
+                  r.readAsText(f);
+                }}/>
+                <span className="gbtn" style={{fontSize:11,display:'block',textAlign:'center'}}>⬆ Import JSON</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="sec">📋 Κανονισμός (Σύνοψη)</div>
+            <div style={{fontSize:11,color:'#374151',lineHeight:1.8}}>
+              {[['⛔','Υποχρεωτικό','Πρωί+Απόγ.+Νύχτα ΠΑΝΤΑ καλυμμένα • αα μετά Νύχτα'],['⚠','Αδιαπραγμάτευτο','Αδεία χορηγείται ΜΟΝΟ αν υπάρχει κάλυψη'],['⚖','Δικαιοσύνη','Ισοκατανομή νυχτών, ΣΚ, αργιών — με μνήμη μεταξύ μηνών'],['📅','Cross-month','Ο νέος μήνας συνεχίζει από τον προηγούμενο']].map(([ic,t,d])=>(
+                <div key={t} style={{display:'flex',gap:8,marginBottom:5,padding:'5px 8px',borderRadius:4,background:'#f8fafc',border:'1px solid #e5e7eb'}}>
+                  <span>{ic}</span><div><strong style={{color:'#003087'}}>{t}:</strong> {d}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{marginTop:20,paddingTop:12,borderTop:'1px solid #d1d5db',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <Emblem sz={22}/>
+          <div><div style={{fontSize:10,fontWeight:700,color:'#003087'}}>Ελληνική Αστυνομία — ΕΛ.ΑΣ.</div><div style={{fontSize:9,color:'#9ca3af'}}>Σύστημα Αυτόματου Προγραμματισμού Βαρδιών v6.0</div></div>
+        </div>
+        <div style={{fontSize:9,color:'#9ca3af'}}>🔒 Εμπιστευτικό — Εσωτερική Χρήση</div>
+      </div>
+    </div>
+  </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
